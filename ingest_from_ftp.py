@@ -29,7 +29,7 @@ def download_files_from_ftp(remote_path, buffer_root, buffer_folder_prefix, conn
     try:
         os.stat(buffer_path)
     except:
-        os.mkdir(buffer_path)
+        os.makedirs(buffer_path)
     remote_files = []
     total_size = 0
     total_num_of_file = 0
@@ -48,6 +48,7 @@ def download_files_from_ftp(remote_path, buffer_root, buffer_folder_prefix, conn
             logging.info('Getting file: {}'.format(remote_file))
             conn.retrieve_file(remote_file, local_filepath)    
             downloaded_files.append(local_filepath)
+            logging.info('File has been downloadeded to: {}'.format(local_filepath))
             total_size = total_size + os.path.getsize(local_filepath)
     logging.info('Total size of file transferred: {}' . format(total_size))
     logging.info('Total number of file transferred: {}'. format(total_num_of_file))
@@ -59,22 +60,32 @@ def upload_files_to_gcs(conn_id, bucket, folder_path, **kwargs):
     files = kwargs['ti'].xcom_pull(task_ids='download_files')
     for file in files:
         fname = os.path.basename(file)
-        if not conn.exists(bucket, folder_path + fname):
-            conn.upload(bucket, folder_path + fname, file)
-            logging.info('File has been uploaded to bucket: {}' . format(fname))
-        else:
-            logging.info('Skipping existed file: {}' . format(fname))
+        try:
+            os.stat(file)
+            if not conn.exists(bucket, folder_path + fname):
+                conn.upload(bucket, folder_path + fname, file)
+                logging.info('File has been uploaded to bucket: {}' . format(fname))
+            else:
+                logging.info('Skipping existed file: {}' . format(fname)) 
+        except:
+            logging.info('Skipping missing local file: {}'.format(file))         
     return files
 
 def delete_tmp(buffer_folder_prefix, **kwargs):
     files = kwargs['ti'].xcom_pull(task_ids='upload_files')
     f,ext = os.path.splitext(files[0])
     for file in files:
-        os.remove(file)
-        logging.info('Temp file has been removed: {}' . format(file))
+        try:
+            os.remove(file)
+            logging.info('Temp file has been removed: {}' . format(file))
+        except OSError, e:
+            logging.info('Skipping missing file: {}' . format(file))
     if buffer_folder_prefix in f:
-        os.rmdir(os.path.dirname(files[0]))
-        logging.info('Temp folder has been removed: {}' . format(f))
+        try:
+            os.rmdir(os.path.dirname(files[0]))
+            logging.info('Temp folder has been removed: {}' . format(f))
+        except OSError, e:
+            logging.info('Skipping missing temp folder: {}' . format(f))
 
 dag = DAG(
     'Ingestion_from_FTP',
