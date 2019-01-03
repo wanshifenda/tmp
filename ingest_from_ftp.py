@@ -1,14 +1,13 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-# from airflow.operators.bash_operator import BashOperator
+from airflow.operators.bash_operator import BashOperator
 from airflow.contrib.hooks.ftp_hook import FTPHook
 from airflow.contrib.hooks.gcs_hook import GoogleCloudStorageHook
 from datetime import datetime, timedelta
 import os
 import logging
-import random
+import time
 
-# one_day_ago = datetime.combine(datetime.today() - timedelta(1), datetime.min.time())
 default_args = {
     'owner': 'Terence',
     'depends_on_past': False,
@@ -22,14 +21,19 @@ default_args = {
 def download_files_from_ftp(remote_path, buffer_root, buffer_folder_prefix, conn_id, ext, **kwargs):
     conn = FTPHook(ftp_conn_id=conn_id)
     date = str(kwargs['execution_date'].day) + '-' + str(kwargs['execution_date'].month) + '-' + str(kwargs['execution_date'].year)
+    try:
+        os.stat(buffer_root)
+        logging.info('Buffer root folder exists already: {}'.format(buffer_root)) 
+    except:
+        os.mkdir(buffer_root)   
     """
-    To make a random buffer folder
+    To make a buffer folder
     """
-    buffer_path = buffer_root + "_".join([buffer_folder_prefix, datetime.now().strftime("%Y%m%d_%H%M%S"), format(random.randint(1, 1000))]) + "/"
+    buffer_path = buffer_root + "_".join([buffer_folder_prefix, datetime.now().strftime("%Y%m%d_%H%M%S")]) + "/"
     try:
         os.stat(buffer_path)
     except:
-        os.makedirs(buffer_path)
+        os.mkdir(buffer_path)
     remote_files = []
     total_size = 0
     total_num_of_file = 0
@@ -59,33 +63,33 @@ def upload_files_to_gcs(conn_id, bucket, folder_path, **kwargs):
     conn = GoogleCloudStorageHook(google_cloud_storage_conn_id=conn_id)
     files = kwargs['ti'].xcom_pull(task_ids='download_files')
     for file in files:
+        file = str(file)
         fname = os.path.basename(file)
         try:
             os.stat(file)
             if not conn.exists(bucket, folder_path + fname):
                 conn.upload(bucket, folder_path + fname, file)
-                logging.info('File has been uploaded to bucket: {}' . format(fname))
+                logging.info('File has been uploaded to bucket: {}' . format(file))
             else:
-                logging.info('Skipping existed file: {}' . format(fname)) 
+                logging.info('Skipping existed file: {}' . format(file)) 
         except:
             logging.info('Skipping missing local file: {}'.format(file))         
-    return files
 
 def delete_tmp(buffer_folder_prefix, **kwargs):
-    files = kwargs['ti'].xcom_pull(task_ids='upload_files')
-    f,ext = os.path.splitext(files[0])
+    files = kwargs['ti'].xcom_pull(task_ids='download_files')
+    # f,ext = os.path.splitext(files[0])
     for file in files:
+        file = str(file)
         try:
             os.remove(file)
             logging.info('Temp file has been removed: {}' . format(file))
         except OSError, e:
             logging.info('Skipping missing file: {}' . format(file))
-    if buffer_folder_prefix in f:
-        try:
-            os.rmdir(os.path.dirname(files[0]))
-            logging.info('Temp folder has been removed: {}' . format(f))
-        except OSError, e:
-            logging.info('Skipping missing temp folder: {}' . format(f))
+    try:
+        os.rmdir(os.path.dirname(file))
+        logging.info('Temp folder has been removed: {}' . format(os.path.dirname(file)))
+    except OSError, e:
+        logging.info('Cant delete, skipping missing temp folder: {}' . format(os.path.dirname(file)))
 
 dag = DAG(
     'Ingestion_from_FTP',
@@ -132,4 +136,10 @@ t3 = PythonOperator(
     dag = dag
 )
 
-t1 >> t2 >> t3
+debug_operator = BashOperator(
+    task_id = 'list_all_folders_in_buffer_root',
+    bash_command = 'rm -rfv /home/airflow/files/*',
+    dag = dag
+)
+
+debug_operator >> t1 >> t2 >> t3
