@@ -32,7 +32,7 @@ exports.runDataprep = (event, callback) => {
         dataflow.projects.templates.create({
           "projectId": projectId,
           "resource": {
-            "gcsPath": "gs://dev-staging-bucket/terence.shi@bbc.co.uk/temp/cloud-dataprep-chartbeat-test-1392644-by-terenceshi_template",
+            "gcsPath": "gs://dev-staging-bucket/terence.shi@bbc.co.uk/temp/cloud-dataprep-chartbeat-test-1393187-by-terenceshi_template",
             "jobName": `${jobName}`,
             "parameters": {
               "customGcsTempLocation": "gs://dev-staging-bucket/terence.shi@bbc.co.uk/temp",
