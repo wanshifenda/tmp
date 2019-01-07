@@ -6,7 +6,7 @@ exports.runDataprep = (event, callback) => {
   const file_ext = (i < 0) ? '' : file.name.substr(i);
   console.log(`Detecting new file uploaded: ${file.bucket}/${file.name}`);
 
-  if(file_ext == '.gz' && file.name.indexOf('Chartbeat') > -1){
+  if((file_ext == '.gz' || file_ext == '.csv') && file.name.indexOf('Chartbeat') > -1){
     google.auth.getApplicationDefault(function (err, authClient) {
       if (err) {
         throw err;
