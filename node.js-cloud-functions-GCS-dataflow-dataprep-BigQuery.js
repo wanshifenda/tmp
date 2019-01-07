@@ -26,12 +26,14 @@ exports.runDataprep = (event, callback) => {
         }
 
         const dataflow = google.dataflow({ version: "v1b3", auth: authClient });
+        var currentdate = new Date();
+        var jobName = "prep-flow-gcs-bq-" + currentdate.getFullYear() + "-" + currentdate.getMonth() + "-" + currentdate.getDay() + "-"+ currentdate.getHours() + "-" + currentdate.getMinutes() + "-" + currentdate.getSeconds();
 
         dataflow.projects.templates.create({
           "projectId": projectId,
           "resource": {
-            "gcsPath": "gs://dev-staging-bucket/terence.shi@bbc.co.uk/temp/cloud-dataprep-chartbeat-test-1392317-by-terenceshi_template",
-            "jobName": "Test-prep-Gfunctions-flow-to-BQ",
+            "gcsPath": "dev-staging-bucket/terence.shi@bbc.co.uk/temp/cloud-dataprep-chartbeat-test-1392644-by-terenceshi_template",
+            "jobName": `${jobName}`,
             "parameters": {
               "customGcsTempLocation": "gs://dev-staging-bucket/terence.shi@bbc.co.uk/temp",
               "outputLocations": "{\"location1\": \"bbc-data-warehouse-dev-7214:chartbeat.sessions\"}",
